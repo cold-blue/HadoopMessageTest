@@ -8,7 +8,7 @@ public class Message {
     public byte[] key;
     public byte[] value;
 
-    public Message (int partitionId, byte[] key, byte[] value) {
+    public Message(int partitionId, byte[] key, byte[] value) {
 
         this.partitionId = partitionId;
         this.key = key;
