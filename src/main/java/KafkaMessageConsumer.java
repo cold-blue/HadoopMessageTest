@@ -1,14 +1,25 @@
 /**
  * Created by cuixuan on 9/28/16.
  */
+import api.Message;
+import api.MessageConsumer;
 import org.apache.kafka.clients.consumer.*;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.kafka.common.TopicPartition;
 
-import java.util.*;
+import java.util.Set;
+import java.util.List;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Collections;
+import java.util.Properties;
+import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.ArrayList;
 
-public class KafkaMessageConsumer {
+public class KafkaMessageConsumer implements MessageConsumer {
 
     private String topic;
     private KafkaConsumer<String, String> consumer;
@@ -25,7 +36,7 @@ public class KafkaMessageConsumer {
 
         ConsumerRecord<String, String> record = null;
 
-        // there is no available records memory and it is needed to fetch more from the topic or topic list(to do)
+        // there is no available records memory and it is needed to fetch more from the topic or topic list
         if (records == null || (!topicPartitionIt.hasNext() && recordIndex >= recordsListSize)) {
             records = consumer.poll(timeout);
             if (records == null) {
@@ -46,6 +57,19 @@ public class KafkaMessageConsumer {
         record = recordsList.get(recordIndex);
         recordIndex ++;
 
+        Map<TopicPartition, OffsetAndMetadata> offsets =
+                Collections.singletonMap(topicPartition, new OffsetAndMetadata(record.offset() + 1));
+        try {
+            consumer.commitAsync(offsets, new OffsetCommitCallback() {
+                @Override
+                public void onComplete(Map<TopicPartition, OffsetAndMetadata> map, Exception e) {
+                    System.out.println("Commit completed.");
+                }
+            });
+        } catch (CommitFailedException e) {
+            System.out.println("Commit failed.");
+        }
+
         return record;
     }
 
@@ -53,82 +77,65 @@ public class KafkaMessageConsumer {
 
         topic = topicOut;
         Properties props = new Properties();
+        Map<String, String> defaults = new HashMap<>();
+        Map<String, String> overrides = new HashMap<>();
 
-        String zookeeperConnect = conf.get("zookeeper.connect");
-        String autoOffsetReset = conf.get("auto.offset.reset");
-        String groupId = conf.get("group.id");
-        String zookeeperSessionTimeoutMs = conf.get("zookeeper.session.timeout.ms");
-        String zookeeperSyncTimeMs = conf.get("zookeeper.sync.time.ms");
-        String autoCommitIntervalsMs = conf.get("auto.commit.intervals.ms");
-        String bootstrapServers = conf.get("bootstrap.servers");
-        //String enableAutoCommit = conf.get("enable.auto.commit");
-        //String heartbeatInterval = conf.get("heartbeat.interval.ms");
-        String sessionTimeoutMs = conf.get("session.timeout.ms");
-        String keyDeserializer = conf.get("key.deserializer");
-        String valueDeserializer = conf.get("value.deserializer");
+        defaults.put("zookeeper.connect", "localhost:2181");
+        defaults.put("auto.offset.reset", "earliest");
+        defaults.put("group.id", "group1");
+        defaults.put("zookeeper.session.timeout.ms", "400");
+        defaults.put("zookeeper.sync.time.ms", "200");
+        defaults.put("auto.commit.intervals.ms", "1000");
+        defaults.put("bootstrap.servers", "localhost:9092");
+        defaults.put("enable.auto.commit", "false");
+        defaults.put("session.timeout.ms", "30000");
+        defaults.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+        defaults.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 
-        props.put("zookeeper.connect", zookeeperConnect); //"localhost:2181");
-        props.put("auto.offset.reset", autoOffsetReset);//"earliest");
-        props.put("group.id", groupId);//"group1");
-        props.put("zookeeper.session.timeout.ms", zookeeperSessionTimeoutMs);// "400");
-        props.put("zookeeper.sync.time.ms", zookeeperSyncTimeMs);// "200");
-        props.put("auto.commit.intervals.ms", autoCommitIntervalsMs); // "1000");
-        props.put("bootstrap.servers", bootstrapServers);// "localhost:9092");
-        props.put("enable.auto.commit", "false");// "true"); //close auto commit
-        //props.put("heartbeat.interval.ms", sessionTimeoutMs);// "1000");
-        props.put("session.timeout.ms", sessionTimeoutMs);// "30000");
-        props.put("key.deserializer", keyDeserializer);//"org.apache.kafka.common.serialization.StringDeserializer");
-        props.put("value.deserializer", valueDeserializer);// "org.apache.kafka.common.serialization.StringDeserializer");
+        for (Iterator<Map.Entry<String, String>> conf_i = conf.iterator(); conf_i.hasNext(); ) {
+            Map.Entry<String, String> entry = conf_i.next();
+            overrides.put(entry.getKey(), entry.getValue());
+        }
+
+        props.putAll(defaults);
+        props.putAll(overrides);
 
         consumer = new KafkaConsumer<String, String>(props);
         consumer.subscribe(Arrays.asList(topic));
     }
 
-    KafkaMessage receive () {
+    public Message receive () {
 
         int partitionId = 0;
         byte[] key = null;
         byte[] value = null;
-        //long offset = 0;
-
+        long offset = 0;
         ConsumerRecord<String, String> record = getRecord();
 
         if (record != null) {
             partitionId = record.partition();
             key = String.valueOf(record.key()).getBytes();
             value = String.valueOf(record.value()).getBytes();
+            offset = record.offset();
+            System.out.println(String.valueOf(offset));
         }
 
-//        offset = record.offset();
-//
-//        Map<TopicPartition, OffsetAndMetadata> offsets = Collections.singletonMap(topicPartition0, new OffsetAndMetadata(offset + 1));
-//        try {
-//            consumer.commitAsync(offsets, new OffsetCommitCallback() {
-//                @Override
-//                public void onComplete(Map<TopicPartition, OffsetAndMetadata> map, Exception e) {
-//                    System.out.println("Commit completed.");
-//                }
-//            });
-//        } catch (CommitFailedException e) {
-//            System.out.println("Commit failed.");
-//        }
-
-        //System.out.println(String.valueOf(offset));
-        KafkaMessage msg = new KafkaMessage(partitionId, key, value);
+        Message msg = new Message(partitionId, key, value);
         return msg;
     }
 
-    Collection<KafkaMessage> receive(int size) {
+    public Collection<Message> receive(int size) {
 
         long partitionId = 0;
         byte[] key = null;
         byte[] value = null;
-        //long offset = 0;
+        long offset = 0;
         int size_i = 0;
-        Collection<KafkaMessage> msgList = new ArrayList<KafkaMessage>();
-
+        Collection<Message> msgList = new ArrayList<Message>();
         int partitionNum = topicPartitions.size();
-        System.out.println("Partition number: " + String.valueOf(partitionNum));
+
+        System.out.println("Topic Partitions Number: " + String.valueOf(partitionNum));
+        System.out.println("Record List Size: " + String.valueOf(recordsListSize));
 
         ConsumerRecord<String, String> record = null;
         while (size_i < size) {
@@ -139,8 +146,9 @@ public class KafkaMessageConsumer {
             partitionId = record.partition();
             key = String.valueOf(record.key()).getBytes();
             value = String.valueOf(record.value()).getBytes();
-            //offset = record.offset();
-            KafkaMessage msg = new KafkaMessage((int)partitionId, key, value);
+            offset = record.offset();
+            System.out.println(String.valueOf(offset));
+            Message msg = new Message((int)partitionId, key, value);
             msgList.add(msg);
             size_i ++;
         }
@@ -148,7 +156,7 @@ public class KafkaMessageConsumer {
         return msgList;
     }
 
-    void close () {
+    public void close () {
         consumer.close();
     }
 }

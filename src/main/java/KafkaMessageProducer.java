@@ -1,61 +1,80 @@
 /**
  * Created by cuixuan on 9/28/16.
  */
-import org.apache.kafka.clients.producer.*;
+import api.Message;
+import api.MessageProducer;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
 import org.apache.hadoop.conf.Configuration;
-import java.util.Properties;
 
-public class KafkaMessageProducer {
+import java.util.HashSet;
+import java.util.Properties;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Iterator;
+
+public class KafkaMessageProducer implements MessageProducer {
 
     private String topic;
     private Producer<String, String> producer;
+    private HashSet<String> propsSet = new HashSet<>();
 
     public KafkaMessageProducer(Configuration conf, String topicOut) {
 
-        Properties props = new Properties();
-
-        String bootstrap = conf.get("bootstrap.servers");
-        String acks = conf.get("acks");
-        String retries = conf.get("retries");
-        String batchSize = conf.get("batch.size");
-        String lingerMs = conf.get("linger.ms");
-        String bufferMemory = conf.get("buffer.memory");
-        String keySerializer = conf.get("key.serializer");
-        String valueSerializer = conf.get("value.serializer");
-
-        props.put("bootstrap.servers", bootstrap); //"localhost:9092");
-        props.put("acks", acks);//"all");
-        props.put("retries", retries);//0);
-        props.put("batch.size", batchSize);//16384);
-        props.put("linger.ms", lingerMs);//1);
-        props.put("buffer.memory", bufferMemory);//33554432);
-        props.put("key.serializer", keySerializer);//"org.apache.kafka.common.serialization.StringSerializer");
-        props.put("value.serializer", valueSerializer);//"org.apache.kafka.common.serialization.StringSerializer");
-        producer = new KafkaProducer<String, String>(props);
-
         topic = topicOut;
+        Properties props = new Properties();
+        Map<String, String> defaults = new HashMap<>();
+        Map<String, String> overrides = new HashMap<>();
+
+        defaults.put("bootstrap.servers", "localhost:9092");
+        defaults.put("acks", "all");
+        defaults.put("retries", "0");
+        defaults.put("batch.size", "16384");
+        defaults.put("linger.ms", "1");
+        defaults.put("buffer.memory", "33554432");
+        defaults.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+        defaults.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+
+        for (Iterator<Map.Entry<String, String>> conf_i = conf.iterator(); conf_i.hasNext(); ) {
+            Map.Entry<String, String> entry = conf_i.next();
+            overrides.put(entry.getKey(), entry.getValue());
+        }
+
+        props.putAll(defaults);
+        props.putAll(overrides);
+
+        producer = new KafkaProducer<String, String>(props);
     }
 
-    void sendAsync (Message msg) {
+    public void sendAsync (Message msg) {
+
         String keyStr = null;
+        String valueStr = null;
+        ProducerRecord producerRecord;
+
         if (msg.key != null) {
             keyStr = new String(msg.key);
         }
-        String valueStr = null;
+
         if (msg.value != null) {
             valueStr = new String(msg.value);
         }
-        ProducerRecord producerRecord = new ProducerRecord(topic, msg.partitionId,
-                keyStr, valueStr);
 
-//        ProducerRecord producerRecord = new ProducerRecord(topic, msg.partitionId,
-//                msg.key, msg.value);
+        if (msg.partitionId != -1) {
+            producerRecord= new ProducerRecord(topic, msg.partitionId,
+                    keyStr, valueStr);
+        }
+        else {
+            producerRecord = new ProducerRecord(topic,
+                    keyStr, valueStr);
+        }
+
         producer.send(producerRecord);
-        //producer.flush();
     }
 
-    void close () {
+    public void close () {
         producer.close();
     }
 
