@@ -1,15 +1,14 @@
 /**
  * Created by cuixuan on 9/28/16.
  */
-import api.Message;
+import api.ConsumerMessage;
 import api.MessageConsumer;
 import org.apache.kafka.clients.consumer.*;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.record.TimestampType;
 
-import java.util.Set;
-import java.util.List;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Collections;
@@ -25,37 +24,77 @@ public class KafkaMessageConsumer implements MessageConsumer {
     private KafkaConsumer<String, String> consumer;
     private long timeout = 10000;
     private ConsumerRecords<String, String> records = null;
-    private Set<TopicPartition> topicPartitions = null;
-    private Iterator<TopicPartition> topicPartitionIt = null;
-    private TopicPartition topicPartition = null;
-    private List<ConsumerRecord<String, String>> recordsList = null;
-    private int recordIndex = 0;
-    private int recordsListSize = 0;
+//    private Set<TopicPartition> topicPartitions = null;
+//    private Iterator<TopicPartition> topicPartitionIt = null;
+//    private TopicPartition topicPartition = null;
+//    private List<ConsumerRecord<String, String>> recordsList = null;
+//    private int recordIndex = 0;
+//    private int recordsListSize = 0;
+    private int recordsSize = 0;
+    private Iterator<ConsumerRecord<String, String>> recordIt = null;
+
+//    private ConsumerRecord<String, String> getRecord() {
+//
+//        ConsumerRecord<String, String> record = null;
+//
+//        // there is no available records memory and it is needed to fetch more from the topic or topic list
+//        if (records == null || (!topicPartitionIt.hasNext() && recordIndex >= recordsListSize)) {
+//            records = consumer.poll(timeout);
+//            if (records == null) {
+//                System.out.println("No available records.");
+//                return null;
+//            }
+//            topicPartitions = records.partitions();
+//            topicPartitionIt = topicPartitions.iterator();
+//        }
+//
+//
+//        if (recordIndex >= recordsListSize) {
+//            topicPartition = topicPartitionIt.next();
+//            recordsList = records.records(topicPartition);
+//            recordsListSize = recordsList.size();
+//            recordIndex = 0;
+//        }
+//
+//        record = recordsList.get(recordIndex);
+//        recordIndex ++;
+//
+//        Map<TopicPartition, OffsetAndMetadata> offsets =
+//                Collections.singletonMap(topicPartition, new OffsetAndMetadata(record.offset() + 1));
+//        try {
+//            consumer.commitAsync(offsets, new OffsetCommitCallback() {
+//                @Override
+//                public void onComplete(Map<TopicPartition, OffsetAndMetadata> map, Exception e) {
+//                    System.out.println("Commit completed.");
+//                }
+//            });
+//        } catch (CommitFailedException e) {
+//            System.out.println("Commit failed.");
+//        }
+//
+//        return record;
+//    }
 
     private ConsumerRecord<String, String> getRecord() {
 
         ConsumerRecord<String, String> record = null;
+        int recordPartition = 0;
+        TopicPartition topicPartition = null;
 
         // there is no available records memory and it is needed to fetch more from the topic or topic list
-        if (records == null || (!topicPartitionIt.hasNext() && recordIndex >= recordsListSize)) {
+        if (records == null || !recordIt.hasNext()) {
             records = consumer.poll(timeout);
             if (records == null) {
                 System.out.println("No available records.");
                 return null;
             }
-            topicPartitions = records.partitions();
-            topicPartitionIt = topicPartitions.iterator();
+            recordsSize = records.count();
+            recordIt = records.iterator();
         }
 
-        if (recordIndex >= recordsListSize) {
-            topicPartition = topicPartitionIt.next();
-            recordsList = records.records(topicPartition);
-            recordsListSize = recordsList.size();
-            recordIndex = 0;
-        }
-
-        record = recordsList.get(recordIndex);
-        recordIndex ++;
+        record = recordIt.next();
+        recordPartition = record.partition();
+        topicPartition = new TopicPartition(topic, recordPartition);
 
         Map<TopicPartition, OffsetAndMetadata> offsets =
                 Collections.singletonMap(topicPartition, new OffsetAndMetadata(record.offset() + 1));
@@ -104,38 +143,58 @@ public class KafkaMessageConsumer implements MessageConsumer {
         consumer.subscribe(Arrays.asList(topic));
     }
 
-    public Message receive () {
+    public ConsumerMessage receive () {
 
         int partitionId = 0;
         byte[] key = null;
         byte[] value = null;
         long offset = 0;
+        long timestamp;
+        TimestampType timestampType;
+        long checksum;
+        int serializedKeySize;
+        int serializedValueSize;
         ConsumerRecord<String, String> record = getRecord();
+        ConsumerMessage msg = null;
 
         if (record != null) {
             partitionId = record.partition();
             key = String.valueOf(record.key()).getBytes();
             value = String.valueOf(record.value()).getBytes();
             offset = record.offset();
-            System.out.println(String.valueOf(offset));
+            timestamp = record.timestamp();
+            timestampType = record.timestampType();
+            checksum = record.checksum();
+            serializedKeySize = record.serializedKeySize();
+            serializedValueSize = record.serializedValueSize();
+
+            msg = new ConsumerMessage(partitionId, offset, timestamp, timestampType,
+                    checksum, serializedKeySize, serializedValueSize, key, value);
         }
 
-        Message msg = new Message(partitionId, key, value);
         return msg;
     }
 
-    public Collection<Message> receive(int size) {
 
-        long partitionId = 0;
+
+    public Collection<ConsumerMessage> receive(int size) {
+
+        int partitionId = 0;
         byte[] key = null;
         byte[] value = null;
         long offset = 0;
+        long timestamp;
+        TimestampType timestampType;
+        long checksum;
+        int serializedKeySize;
+        int serializedValueSize;
         int size_i = 0;
-        Collection<Message> msgList = new ArrayList<Message>();
-        int partitionNum = topicPartitions.size();
+        Collection<ConsumerMessage> msgList = new ArrayList<ConsumerMessage>();
+        //int partitionNum = topicPartitions.size();
 
-        System.out.println("Topic Partitions Number: " + String.valueOf(partitionNum));
-        System.out.println("Record List Size: " + String.valueOf(recordsListSize));
+        //System.out.println("Topic Partitions Number: " + String.valueOf(partitionNum));
+        //System.out.println("Record List Size: " + String.valueOf(recordsListSize));
+        System.out.println("Records Size: " + String.valueOf(recordsSize));
 
         ConsumerRecord<String, String> record = null;
         while (size_i < size) {
@@ -147,13 +206,29 @@ public class KafkaMessageConsumer implements MessageConsumer {
             key = String.valueOf(record.key()).getBytes();
             value = String.valueOf(record.value()).getBytes();
             offset = record.offset();
-            System.out.println(String.valueOf(offset));
-            Message msg = new Message((int)partitionId, key, value);
+            timestamp = record.timestamp();
+            timestampType = record.timestampType();
+            checksum = record.checksum();
+            serializedKeySize = record.serializedKeySize();
+            serializedValueSize = record.serializedValueSize();
+
+            ConsumerMessage msg = new ConsumerMessage(partitionId, offset, timestamp, timestampType,
+                    checksum, serializedKeySize, serializedValueSize, key, value);
             msgList.add(msg);
             size_i ++;
         }
 
         return msgList;
+    }
+
+    public void seek(int partitionId, long offset) {
+
+        TopicPartition topicPartition = new TopicPartition(topic, partitionId);
+
+        consumer.poll(1);
+
+        consumer.seek(topicPartition, 0);
+
     }
 
     public void close () {

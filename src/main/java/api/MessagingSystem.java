@@ -37,27 +37,17 @@ public abstract class MessagingSystem {
         } catch (Exception e) {
             System.out.println("Invalid instance.");
         }
-        
+
         return messagingSystem;
     }
 
-    MessageProducer createProducer(String topic) {
-        return this.createProducer(topic);
-    }
+    public abstract MessageProducer createProducer(String topic);
 
-    MessageConsumer createConsumer(String topic) {
-        return this.createConsumer(topic);
-    }
+    public abstract MessageConsumer createConsumer(String topic);
 
-    boolean topicExists(String topic) {
-        return this.topicExists(topic);
-    }
+    public abstract boolean topicExists(String topic);
 
-    boolean createTopic(final String topic, final int partitions, final int replica) {
-        return this.createTopic(topic, partitions, replica);
-    }
+    public abstract boolean createTopic(final String topic, final int partitions, final int replica);
 
-    void close() {
-
-    }
+    public abstract void close();
 }

@@ -2,7 +2,8 @@
  * Created by cuixuan on 9/28/16.
  */
 //import api.MessagingSystem;
-import api.Message;
+import api.ProducerMessage;
+import api.ConsumerMessage;
 import org.apache.hadoop.conf.Configuration;
 
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ public class TestMain {
         conf.set("auto.offset.reset", "earliest");
         conf.set("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         conf.set("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+        //conf.set("max.partition.fetch.bytes", "4096");
 
         conf.set("hadoop.messaging.system", "KafkaMessagingSystem");
         conf.set("hadoop.messaging.kafka.bootstrap.servers", "localhost:9092");
@@ -49,10 +51,10 @@ public class TestMain {
                 KafkaMessageProducer messageProducer = messagingSystem.createProducer(topic);
 
                 int count = 0;
-                Message msg = new Message(null, null);
+                ProducerMessage msg = new ProducerMessage(null, null);
 
-                while((count ++) != 5) {
-                    msg.value = (String.valueOf(this.getId()) + "msg-" + String.valueOf(count)).getBytes();
+                while((count ++) != 10) {
+                    msg.setValue((String.valueOf(this.getId()) + "msg-" + String.valueOf(count)).getBytes());
                     //msg.key = msg.value;
                     messageProducer.sendAsync(msg);
                 }
@@ -66,23 +68,24 @@ public class TestMain {
         class MyThread2 extends Thread {
             public void run() {
                 KafkaMessageConsumer messageConsumer = messagingSystem.createConsumer(topic);
-                Message msgRec;
+                ConsumerMessage msgRec;
 
                 msgRec = messageConsumer.receive();
-                System.out.println("Single message:\nval: " + new String(msgRec.value) +
-                        " key: " + new String(msgRec.key) + " partitionId: " + String.valueOf(msgRec.partitionId) + "\n");
+                System.out.println("Single message:\noffset: " + String.valueOf(msgRec.offset()) + " val: " +
+                        new String(msgRec.value()) + " key: " + new String(msgRec.key()) + " partitionId: " +
+                        String.valueOf(msgRec.partitionId()) + "\n");
 
-                int recCount = 2;
+                int recCount = 5;
                 System.out.println(String.valueOf(recCount) + " messages:\n");
-                Collection<Message> msgCol = messageConsumer.receive(recCount);
-                List<Message> msgList = new ArrayList<>();
+                Collection<ConsumerMessage> msgCol = messageConsumer.receive(recCount);
+                List<ConsumerMessage> msgList = new ArrayList<>();
                 msgList.addAll(msgCol);
                 int recCount_i = 0;
                 while (recCount_i < recCount) {
                     msgRec = msgList.get(recCount_i);
-                    System.out.println("val: " + new String(msgRec.value) +
-                            " key: " + new String(msgRec.key) + " partitionId: " +
-                            String.valueOf(msgRec.partitionId) + "\n");
+                    System.out.println("offset: " + String.valueOf(msgRec.offset()) + " val: " +
+                            new String(msgRec.value()) + " key: " + new String(msgRec.key()) + " partitionId: " +
+                            String.valueOf(msgRec.partitionId()) + "\n");
                     recCount_i ++;
                 }
 
@@ -93,8 +96,8 @@ public class TestMain {
 
         MyThread thread1 = new MyThread();
         MyThread2 thread1_2 = new MyThread2();
-        MyThread thread2 = new MyThread();
-        MyThread2 thread2_2 = new MyThread2();
+        //MyThread thread2 = new MyThread();
+        //MyThread2 thread2_2 = new MyThread2();
         thread1.start();
         thread1_2.start();
 //        try {
@@ -103,15 +106,15 @@ public class TestMain {
 //            e.printStackTrace();
 //        }
 
-        thread2.start();
-        thread2_2.start();
+        //thread2.start();
+        //thread2_2.start();
         //thread3.start();
 
         try {
             thread1.join();
             thread1_2.join();
-            thread2.join();
-            thread2_2.join();
+            //thread2.join();
+            //thread2_2.join();
             //thread3.join();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -126,7 +129,7 @@ public class TestMain {
 //        KafkaMessageConsumer messageConsumer = messagingSystem.createConsumer(topic);
 //
 //        int count = 0;
-//        api.Message msg = new api.Message(0, null, null);
+//        api.ProducerMessage msg = new api.ProducerMessage(0, null, null);
 //
 //        while((count ++) != 5) {
 //            msg.value = ("msg-" + String.valueOf(count)).getBytes();
@@ -146,15 +149,15 @@ public class TestMain {
 //
 //
 //
-//        api.Message msgRec;
+//        api.ProducerMessage msgRec;
 //        msgRec = messageConsumer.receive();
 //        System.out.println("Single message:\nval: " + new String(msgRec.value) +
 //        " key: " + new String(msgRec.key) + " partitionId: " + String.valueOf(msgRec.partitionId) + "\n");
 //
 //        int recCount = 5;
 //        System.out.println(String.valueOf(recCount) + " messages:\n");
-//        Collection<api.Message> msgCol = messageConsumer.receive(recCount);
-//        List<api.Message> msgList = new ArrayList<>();
+//        Collection<api.ProducerMessage> msgCol = messageConsumer.receive(recCount);
+//        List<api.ProducerMessage> msgList = new ArrayList<>();
 //        msgList.addAll(msgCol);
 //        int recCount_i = 0;
 //        while (recCount_i < recCount) {

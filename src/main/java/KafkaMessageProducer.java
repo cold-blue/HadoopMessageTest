@@ -1,7 +1,7 @@
 /**
  * Created by cuixuan on 9/28/16.
  */
-import api.Message;
+import api.ProducerMessage;
 import api.MessageProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -22,6 +22,8 @@ public class KafkaMessageProducer implements MessageProducer {
     private HashSet<String> propsSet = new HashSet<>();
 
     public KafkaMessageProducer(Configuration conf, String topicOut) {
+        if (topicOut == null)
+            throw new IllegalArgumentException("Topic cannot be null");
 
         topic = topicOut;
         Properties props = new Properties();
@@ -48,28 +50,24 @@ public class KafkaMessageProducer implements MessageProducer {
         producer = new KafkaProducer<String, String>(props);
     }
 
-    public void sendAsync (Message msg) {
+    public void sendAsync (ProducerMessage msg) {
 
         String keyStr = null;
         String valueStr = null;
         ProducerRecord producerRecord;
 
-        if (msg.key != null) {
-            keyStr = new String(msg.key);
+        if (msg.key() != null) {
+            keyStr = new String(msg.key());
         }
 
-        if (msg.value != null) {
-            valueStr = new String(msg.value);
+        if (msg.value() != null) {
+            valueStr = new String(msg.value());
         }
 
-        if (msg.partitionId != -1) {
-            producerRecord= new ProducerRecord(topic, msg.partitionId,
-                    keyStr, valueStr);
-        }
-        else {
-            producerRecord = new ProducerRecord(topic,
-                    keyStr, valueStr);
-        }
+
+        producerRecord= new ProducerRecord(topic, msg.partitionId(), msg.timestamp(),
+                keyStr, valueStr);
+
 
         producer.send(producerRecord);
     }
