@@ -22,11 +22,20 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="true" />
-        <module name="HadoopMessageTest" />
+        <module name="api" />
+        <module name="kafkaimp" />
+        <module name="kafkaimp08" />
+        <module name="messagetest" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
+      <module name="api" target="1.8" />
       <module name="HadoopMessageTest" target="1.8" />
+      <module name="kafkaimp" target="1.8" />
+      <module name="kafkaimp0.8" target="1.8" />
+      <module name="kafkaimp08" target="1.8" />
+      <module name="messagetest" target="1.8" />
+      <module name="messageTest" target="1.8" />
     </bytecodeTargetLevel>
   </component>
 </project>
