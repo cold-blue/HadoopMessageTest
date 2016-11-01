@@ -14,7 +14,6 @@ import org.I0Itec.zkclient.ZkConnection;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 
-
 import scala.collection.JavaConversions;
 
 import java.util.Collection;

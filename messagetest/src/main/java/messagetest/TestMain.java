@@ -18,7 +18,6 @@ import kafkaimp08.KafkaMessagingSystem;
 import org.apache.hadoop.conf.Configuration;
 
 import java.util.ArrayList;
-
 import java.util.Collection;
 import java.util.List;
 
@@ -40,9 +39,10 @@ public class TestMain {
         conf.set("group.id", "group1");
         conf.set("zookeeper.sync.time.ms", "200");
         conf.set("session.timeout.ms", "30000");
-        conf.set("zookeeper.session.timeout.ms", "400");
+        conf.set("zookeeper.session.timeout.ms", "1000");
         conf.set("auto.commit.intervals.ms", "1000");
         //conf.set("auto.offset.reset", "earliest");
+        //conf.set("auto.offset.reset", "smallest");
         conf.set("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         conf.set("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         //conf.set("max.partition.fetch.bytes", "4096");
@@ -85,8 +85,11 @@ public class TestMain {
 
                 msgRec = messageConsumer.receive();
                 System.out.println("Single message:\noffset: " + String.valueOf(msgRec.offset()) + " val: " +
-                        new String(msgRec.value()) + " key: " + new String(msgRec.key()) + " partitionId: " +
+                        new String(msgRec.value() == null? "null".getBytes(): msgRec.value()) +
+                        " key: " + new String(msgRec.key() == null? "null".getBytes(): msgRec.key()) +
+                        " partitionId: " +
                         String.valueOf(msgRec.partitionId()) + "\n");
+                System.out.println("reader: " + String.valueOf(this.getId()) + "\n");
 
                 int recCount = 5;
                 System.out.println(String.valueOf(recCount) + " messages:\n");
@@ -94,12 +97,40 @@ public class TestMain {
                 List<ConsumerMessage> msgList = new ArrayList<>();
                 msgList.addAll(msgCol);
                 int recCount_i = 0;
+                int partition0 = 0; // previous
+                int partition1; //current
                 while (recCount_i < recCount) {
                     msgRec = msgList.get(recCount_i);
-                    System.out.println("offset: " + String.valueOf(msgRec.offset()) + " val: " +
-                            new String(msgRec.value()) + " key: " + new String(msgRec.key()) + " partitionId: " +
-                            String.valueOf(msgRec.partitionId()) + "\n");
-                    System.out.println(msgRec.toString());
+                    if (recCount_i == 0) {
+                        partition1 = msgRec.partitionId();
+                        partition0 = partition1;
+                        System.out.println("offset: " + String.valueOf(msgRec.offset()) + " val: " +
+                        new String(msgRec.value() == null? "null".getBytes(): msgRec.value()) +
+                        " key: " +
+                        new String(msgRec.key() == null? "null".getBytes(): msgRec.key()) +
+                        " partitionId: " +
+                        String.valueOf(msgRec.partitionId()) + "\n");
+                        System.out.println("reader: " + String.valueOf(this.getId()) + "\n");
+                    }
+
+                    partition1 = msgRec.partitionId();
+                    if (partition1 != partition0) {
+                        partition0 = partition1;
+                        System.out.println("offset: " + String.valueOf(msgRec.offset()) + " val: " +
+                                new String(msgRec.value() == null? "null".getBytes(): msgRec.value()) +
+                                " key: " +
+                                new String(msgRec.key() == null? "null".getBytes(): msgRec.key()) +
+                                " partitionId: " +
+                                String.valueOf(msgRec.partitionId()) + "\n");
+                        System.out.println("reader: " + String.valueOf(this.getId()) + "\n");
+                    }
+//                    System.out.println("offset: " + String.valueOf(msgRec.offset()) + " val: " +
+//                            new String(msgRec.value() == null? "null".getBytes(): msgRec.value()) +
+//                            " key: " +
+//                            new String(msgRec.key() == null? "null".getBytes(): msgRec.key()) +
+//                            " partitionId: " +
+//                            String.valueOf(msgRec.partitionId()) + "\n");
+                    //System.out.println(msgRec.toString());
                     recCount_i ++;
                 }
 
@@ -117,25 +148,26 @@ public class TestMain {
             e.printStackTrace();
         }
         MyThread2 thread1_2 = new MyThread2();
-        //MyThread thread2 = new MyThread();
-        //MyThread2 thread2_2 = new MyThread2();
+        MyThread thread2 = new MyThread();
+        MyThread2 thread2_2 = new MyThread2();
 
         thread1_2.start();
-//        try {
-//            Thread.sleep(300);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
 
-        //thread2.start();
-        //thread2_2.start();
+        try {
+            Thread.sleep(30);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        thread2.start();
+        thread2_2.start();
         //thread3.start();
 
         try {
             //thread1.join();
             thread1_2.join();
-            //thread2.join();
-            //thread2_2.join();
+            thread2.join();
+            thread2_2.join();
             //thread3.join();
         } catch (InterruptedException e) {
             e.printStackTrace();
